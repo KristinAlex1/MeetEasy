@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "cross-env NODE_OPTIONS=--no-warnings node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.4.0",
@@ -22,10 +24,11 @@
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.1",
     "class-variance-authority": "^0.7.0",
+    "dotenv": "^16.4.5",
     "embla-carousel-autoplay": "^8.3.1",
     "embla-carousel-react": "^8.3.0",
     "lucide-react": "^0.453.0",
-    "next": "15.0.1",
+    "next": "^15.0.1",
     "pg": "^8.13.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -36,9 +39,19 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "eslint": "^8",
+    "@babel/core": "^7.24.0",
+    "@babel/preset-env": "^7.24.0",
+    "@babel/preset-react": "^7.23.3",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^14.2.1",
+    "babel-jest": "^29.7.0",
+    "cross-env": "^7.0.3",
+    "eslint": "^8.57.0",
     "eslint-config-next": "15.0.1",
-    "postcss": "^8",
+    "eslint-plugin-jest": "^27.9.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "postcss": "^8.4.35",
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.1"
   }

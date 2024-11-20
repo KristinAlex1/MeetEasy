@@ -1,44 +1,47 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server"; // Import NextResponse for handling responses
+// middleware.js
+import { clerkMiddleware } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
-// Define the routes that should be protected
-const isProtectedRoute = createRouteMatcher([
-  "/main/dashboard(.*)",
-  "/main/events(.*)",
-  "/main/meetings(.*)",
-  "/main/availability(.*)",
-]);
+// Define protected routes
+const protectedPaths = [
+  "/main/dashboard",
+  "/main/events",
+  "/main/meetings",
+  "/main/availability"
+];
 
 export default clerkMiddleware({
-  beforeAuth(auth, req) {
-    console.log("Request URL:", req.url);
-    console.log("Auth Details Before:", auth);
-  },
-  afterAuth(auth, req) {
-    console.log("Auth Details After:", auth);
+  publicRoutes: ["/", "/sign-in", "/sign-up"],
 
-    if (!auth.userId && isProtectedRoute(req.nextUrl.pathname)) {
-      console.error("Unauthorized access attempt to protected route:", req.nextUrl.pathname);
-      // Redirect unauthenticated users to the sign-in page
-      return NextResponse.redirect(new URL("/sign-in", req.url));
+  afterAuth(auth, req) {
+    console.log("Processing request for:", req.nextUrl.pathname);
+
+    const isProtectedRoute = protectedPaths.some(path => 
+      req.nextUrl.pathname.startsWith(path)
+    );
+
+    if (!auth.userId && isProtectedRoute) {
+      console.log("Unauthorized access attempt:", req.nextUrl.pathname);
+      const signInUrl = new URL("/sign-in", req.url);
+      signInUrl.searchParams.set("redirect_url", req.nextUrl.pathname);
+      return NextResponse.redirect(signInUrl);
     }
 
-    // If the user is authenticated, let the request proceed
     return NextResponse.next();
   },
-  onError(err, req) {
-    console.error("Middleware Error:", err.message);
+
+  onError(err, _req) {
+    console.error("Auth Error:", err.message);
     return NextResponse.json(
-      { error: "Middleware authentication error", message: err.message },
-      { status: 500 }
+      { error: "Authentication error", message: err.message },
+      { status: 401 }
     );
-  },
+  }
 });
 
 export const config = {
   matcher: [
-    // Protect application and API routes
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
-  ],
+    "/((?!_next/static|favicon.ico|.*\\.).*)",
+    "/api/(.*)"
+  ]
 };

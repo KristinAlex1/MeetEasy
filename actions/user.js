@@ -1,62 +1,70 @@
+// actions/user.js
 "use server";
 
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/lib/prisma";
 
 export async function updateUsername(username) {
+  console.log('Server Action: Starting with username', username);
+  
   try {
+    // Verify database connection
+    try {
+      await db.$queryRaw`SELECT NOW()`;
+    } catch (dbError) {
+      throw new Error(`Database connection failed: ${dbError.message}`);
+    }
+
     // Validate input
     if (!username || typeof username !== "string") {
-      console.error("Invalid username provided.");
-      throw new Error("Invalid username.");
+      throw new Error("Invalid username provided");
     }
 
-    // Retrieve authenticated user's details
-    const { userId, sessionId } = auth();
-    console.log("Auth Details in updateUsername:", { userId, sessionId });
-
+    // Get auth details and user data
+    const { userId } = auth();
     if (!userId) {
-      console.error("Authentication failed. No userId found.");
-      throw new Error("Unauthorized");
+      throw new Error("User not authenticated");
     }
 
-    // Check if the username already exists in the database
-    const existingUsername = await db.user.findUnique({
+    // Get user email from Clerk
+    const clerkUser = await clerkClient.users.getUser(userId);
+    const userEmail = clerkUser.emailAddresses[0]?.emailAddress;
+    if (!userEmail) {
+      throw new Error("User email not found");
+    }
+
+    // Check for existing username
+    const existingUser = await db.user.findUnique({
       where: { username },
+      select: { clerkUserId: true }
     });
 
-    if (existingUsername && existingUsername.clerkUserId !== userId) {
-      console.error(`Username "${username}" already taken by another user.`);
-      throw new Error("Username is already taken.");
+    if (existingUser && existingUser.clerkUserId !== userId) {
+      throw new Error("Username already taken");
     }
 
-    // Create or update user record in the database
+    // Update user record
     const updatedUser = await db.user.upsert({
       where: { clerkUserId: userId },
       create: {
         clerkUserId: userId,
         username,
+        email: userEmail,
       },
-      update: { username },
+      update: { 
+        username,
+        email: userEmail
+      },
     });
 
-    console.log("Database user record updated:", updatedUser);
-
-    // Update the username in Clerk
+    // Update Clerk profile
     await clerkClient.users.updateUser(userId, {
       username,
     });
 
-    console.log("Clerk user profile updated with username:", username);
-
-    // Return success response
     return { success: true, username: updatedUser.username };
   } catch (error) {
-    // Enhanced error logging for better debugging
-    console.error("Error in updateUsername function:", {
-      message: error.message,
-      stack: error.stack,
-    });
-    throw new Error(error.message || "An error occurred while updating the username.");
+    console.error("Update failed:", error);
+    throw error;
   }
 }
