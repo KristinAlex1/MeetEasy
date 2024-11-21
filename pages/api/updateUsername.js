@@ -1,4 +1,5 @@
-import { updateUsername } from "@/actions/user";
+// FILE: pages/api/updateUsername.js
+import { updateUsername } from "@/actions/users";
 
 export default async function handler(req, res) {
   console.log('API Route: Received request', { 
@@ -8,10 +9,10 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
-      const { username } = req.body;
+      const { username } = req.body; 
       console.log('API Route: Processing username', username);
       
-      const result = await updateUsername(username);
+      const result = await updateUsername(req, username); // Pass the req object
       console.log('API Route: Success', result);
       
       res.status(200).json(result);

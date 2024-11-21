@@ -1,83 +1,123 @@
+// FILE: app/(main)/dashboard/page.jsx
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useUser } from "@clerk/nextjs";
-import { Button } from "@/components/ui/button";
+import React, { useEffect, useState } from "react";
+import { useUser, useAuth } from "@clerk/nextjs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { usernameSchema } from "@/app/lib/validators";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { BarLoader } from "react-spinners";
-import { updateUsername } from "@/actions/user";
+import { usernameSchema } from "@/app/lib/validators";
 
 const Dashboard = () => {
-  const { isLoaded, user, isSignedIn } = useUser();
+  const { isLoaded, user } = useUser();
+  const { getToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState(null);
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm({
+  const { register, handleSubmit, setValue, getValues, formState: { errors } } = useForm({
     resolver: zodResolver(usernameSchema),
     defaultValues: {
-      username: "",
+      username: "", // Initial value
     },
   });
 
-  const onSubmit = async (data) => {
-    if (!isSignedIn) {
-      setServerError("Please sign in to update your username");
-      return;
+  useEffect(() => {
+    if (isLoaded && user) {
+      fetchUserData();
     }
+  }, [isLoaded, user]);
 
+  const fetchUserData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setServerError(null);
+      const token = await getToken();
+      const response = await fetch('/api/get-user', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-      const result = await updateUsername(data.username);
-      
-      if (result.error) {
-        throw new Error(result.error);
+      const contentType = response.headers.get("content-type");
+      console.log('Response Content-Type:', contentType);
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error("Received non-JSON response");
       }
 
-      setValue("username", result.username);
-      
+      const data = await response.json();
+      if (response.ok) {
+        setValue("username", data.username);
+      } else {
+        setServerError(data.error);
+      }
     } catch (error) {
-      console.error("Error saving username:", error);
-      setServerError(error.message || "Failed to update username");
+      console.error('Error fetching user data:', error);
+      setServerError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onSubmit = async (data) => {
+    setLoading(true);
+    try {
+      const currentUsername = getValues("username");
+      if (data.username === currentUsername) {
+        console.log("Username is unchanged.");
+        setLoading(false);
+        return;
+      }
+      const token = await getToken();
+      const response = await fetch("/api/updateUsername", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // Include the session token
+        },
+        body: JSON.stringify({ username: data.username }),
+      });
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error("Received non-JSON response");
+      }
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update username");
+      }
+
+      console.log("Username updated successfully:", result);
+      setServerError(null); // Clear any server error messages
+    } catch (error) {
+      console.error("Error updating username:", error.message);
+      setServerError("Failed to update username. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   if (!isLoaded) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <BarLoader color="#36d7b7" />
-      </div>
-    );
-  }
-
-  if (!isSignedIn) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Please Sign In</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>You must be signed in to update your username</p>
-        </CardContent>
-      </Card>
-    );
+    return <div>Loading user data...</div>;
   }
 
   return (
     <div className="space-y-8">
+      {/* Welcome Card */}
       <Card>
         <CardHeader>
           <CardTitle>Welcome, {user?.firstName || "User"}</CardTitle>
         </CardHeader>
       </Card>
 
+      {/* Unique Link Card */}
       <Card>
         <CardHeader>
           <CardTitle>Your Unique Link</CardTitle>
@@ -87,12 +127,12 @@ const Dashboard = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span>{window?.location.origin}/</span>
+                {/* Username Input */}
                 <Input
                   {...register("username")}
                   type="text"
                   placeholder="Username"
                   className="border rounded-md px-2 py-1"
-                  disabled={loading}
                 />
               </div>
               {errors.username && (

@@ -27,7 +27,7 @@ const setupTest = async () => {
   }));
 
   // Import after mocks are setup
-  const { updateUsername } = await import('../actions/user.js');
+  const { updateUsername } = await import('../actions/users.js');
   return { updateUsername };
 };
 
